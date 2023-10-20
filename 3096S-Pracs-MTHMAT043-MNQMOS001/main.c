@@ -24,7 +24,6 @@
 #include <stdio.h>
 #include "stm32f0xx.h"
 #include <lcd_stm32f0.c>
-#include <math.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -56,23 +55,14 @@ DMA_HandleTypeDef hdma_tim2_ch1;
 /* USER CODE BEGIN PV */
 // TODO: Add code for global variables, including LUTs
 
-uint32_t Sin_LUT[NS] = {511, 486, 460, 435, 410, 386, 361, 337, 314, 291, 268, 246, 225, 204, 184, 165, 147, 130, 113, 98, 84, 70, 58, 47, 37, 28, 20, 14, 8,
-		4, 1, 0, 0, 0, 3, 6, 11, 17, 24, 32, 42, 52, 64, 77, 91, 106, 121, 138, 156, 175, 194, 214, 235, 257, 279, 302, 326, 349, 374, 398, 423, 448, 473, 498,
-		524, 549, 574, 599, 624, 648, 673, 696, 720, 743, 765, 787, 808, 828, 847, 866, 884, 901, 916, 931, 945, 958, 970, 980, 990, 998, 1005, 1011, 1016, 1019,
-		1022, 1022, 1022, 1021, 1018, 1014, 1008, 1002, 994, 985, 975, 964, 952, 938, 924, 909, 892, 875, 857, 838, 818, 797, 776, 754, 731, 708, 685, 661, 636,
-		612, 587, 562, 536, 511};
+uint32_t Sin_LUT[NS] = {};
 
-uint32_t saw_LUT[NS] = {0, 7, 15, 23, 31, 39, 47, 55, 63, 71, 79, 87, 95, 103, 111, 119, 127, 135, 143, 151, 159, 167, 175, 183, 191, 199, 207, 215, 223, 231, 239,
-		247, 255, 263, 271, 279, 287, 295, 303, 311, 319, 327, 335, 343, 351, 359, 367, 375, 383, 391, 399, 407, 415, 423, 431, 439, 447, 455, 463, 471, 479, 487,
-		495, 503, 511, 519, 527, 535, 543, 551, 559, 567, 575, 583, 591, 599, 607, 615, 623, 631, 639, 647, 655, 663, 671, 679, 687, 695, 703, 711, 719, 727, 735,
-		743, 751, 759, 767, 775, 783, 791, 799, 807, 815, 823, 831, 839, 847, 855, 863, 871, 879, 887, 895, 903, 911, 919, 927, 935, 943, 951, 959, 967, 975, 983,
-		991, 999, 1007, 1015};
+uint32_t saw_LUT[NS] = {};
 
-uint32_t triangle_LUT[NS] = {0, 15, 31, 47, 63, 79, 95, 111, 127, 143, 159, 175, 191, 207, 223, 239, 255, 271, 287, 303, 319, 335, 351, 367, 383, 399, 415, 431,
-		447, 463, 479, 495, 511, 527, 543, 559, 575, 591, 607, 623, 639, 655, 671, 687, 703, 719, 735, 751, 767, 783, 799, 815, 831, 847, 863, 879, 895, 911, 927,
-		943, 959, 975, 991, 1007, 1023, 1006, 990, 974, 958, 941, 925, 909, 893, 876, 860, 844, 828, 811, 795, 779, 763, 746, 730, 714, 698, 682, 665, 649, 633, 617,
-		600, 584, 568, 552, 535, 519, 503, 487, 470, 454, 438, 422, 405, 389, 373, 357, 341, 324, 308, 292, 276, 259, 243, 227, 211, 194, 178, 162, 146, 129, 113, 97,
-		81, 64, 48, 32, 16, 0};
+uint32_t triangle_LUT[NS] = {};
+uint32_t mode = 0;
+uint32_t * waveform = 0;
+int end = 0;
 
 // TODO: Equation to calculate TIM2_Ticks
 uint32_t TIM2_Ticks = TIM2CLK/(F_SIGNAL*NS); // How often to write new LUT value
@@ -127,23 +117,23 @@ int main(void)
   MX_TIM3_Init();
 
   // Generate the sinusoid lookup table
-//  for (int i = 0; i < NS; i++) {
-//	  Sin_LUT[i] = (MAX_VALUE/ 2) * (1 + sin(2 * M_PI * i / NS));
-//  }
-//
-//  // Generate the sawtooth wave lookup table
-//  for (int i = 0; i < NS; i++) {
-//	  saw_LUT[i] = (i * (MAX_VALUE + 1)) / NS;
-//  }
-//
-//  // Generate the triangular wave lookup table
-//  for (int i = 0; i < NS; i++) {
-//	  if (i < NS / 2) {
-//		  triangle_LUT[i] = (i * (MAX_VALUE + 1)) / (NS / 2);
-//	  } else {
-//		  triangle_LUT[i] = MAX_VALUE - ((i - NS / 2) * (MAX_VALUE + 1)) / (NS / 2);
-//	  }
-//  }
+  for (int i = 0; i < NS; i++) {
+	  Sin_LUT[i] = (MAX_VALUE/ 2) * (1 + sin(2 * 3.14 * i / NS));
+  }
+
+  // Generate the sawtooth wave lookup table
+  for (int i = 0; i < NS; i++) {
+	  saw_LUT[i] = (i * (MAX_VALUE + 1)) / NS;
+  }
+
+  // Generate the triangular wave lookup table
+  for (int i = 0; i < NS; i++) {
+	  if (i < NS / 2) {
+		  triangle_LUT[i] = (i * (MAX_VALUE + 1)) / (NS / 2);
+	  } else {
+		  triangle_LUT[i] = MAX_VALUE - ((i - NS / 2) * (MAX_VALUE + 1)) / (NS / 2);
+	  }
+  }
 
 
   /* USER CODE BEGIN 2 */
@@ -386,48 +376,44 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-uint32_t mode =0;
 void EXTI0_1_IRQHandler(void)
 {
 	// TODO: Debounce using HAL_GetTick()
 	int start = HAL_GetTick();
-	int end =0;
 
 	// TODO: Disable DMA transfer and abort IT, then start DMA in IT mode with new LUT and re-enable transfer
 	// HINT: Consider using C's "switch" function to handle LUT changes
-	if (Button0_Pin == GPIO_PIN_SET && (start - end)>200)
+	if (start - end>200)
 		{
 			__HAL_TIM_DISABLE_DMA(&htim2, TIM_DMA_CC1);
-			uint32_t DestAddress = (uint32_t) &(TIM3->CCR1);
-			uint32_t * source = 0;
-			mode = (mode +1)%3;
+			HAL_DMA_Abort_IT(&hdma_tim2_ch1);
+			uint32_t DestAddress = (uint32_t) &(TIM3->CCR3);
+
+
 			switch(mode){
 			case 0:
-				source = (uint32_t *)Sin_LUT;
+				mode = 1;
+				waveform = (uint32_t *)Sin_LUT;
 				lcd_command(CLEAR);
 				lcd_putstring("Sine");
 				break;
 			case 1:
-				source = (uint32_t *)saw_LUT;
+				mode = 2;
+				waveform = (uint32_t *)saw_LUT;
 				lcd_command(CLEAR);
 				lcd_putstring("Sawtooth");
 				break;
 			case 2:
+				mode = 0;
 				lcd_command(CLEAR);
 				lcd_putstring("Triangular");
-				source = (uint32_t *)triangle_LUT;
+				waveform = (uint32_t *)triangle_LUT;
 				break;
-			default:
-				lcd_command(CLEAR);
-				lcd_putstring("Sine");
-				source = (uint32_t *)Sin_LUT;
-				break;
-			end = start;
 			}
-			HAL_StatusTypeDef stat = HAL_DMA_Abort_IT(&hdma_tim2_ch1);
-			stat = HAL_DMA_Start_IT(&hdma_tim2_ch1, (uint32_t)source, DestAddress, NS);
+			//HAL_DMA_Abort_IT(&hdma_tim2_ch1);
+			HAL_DMA_Start_IT(&hdma_tim2_ch1, (uint32_t)waveform, DestAddress, NS);
 			__HAL_TIM_ENABLE_DMA(&htim2, TIM_DMA_CC1);
-
+			end = start;
 		}
 
 	HAL_GPIO_EXTI_IRQHandler(Button0_Pin); // Clear interrupt flags
@@ -465,3 +451,4 @@ void assert_failed(uint8_t *file, uint32_t line)
   /* USER CODE END 6 */
 }
 #endif /* USE_FULL_ASSERT */
+
